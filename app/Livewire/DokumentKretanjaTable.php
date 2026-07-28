@@ -14,6 +14,10 @@ class DokumentKretanjaTable extends Component
 
     public string $search = '';
 
+    public string $sortBy = 'created_at';
+
+    public string $sortDir = 'desc';
+
     public ?int $teamId = null;
 
     public bool $allowDelete = false;
@@ -33,6 +37,18 @@ class DokumentKretanjaTable extends Component
 
     public function updatingSearch(): void
     {
+        $this->resetPage();
+    }
+
+    public function sort(string $column): void
+    {
+        if ($this->sortBy === $column) {
+            $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $column;
+            $this->sortDir = 'asc';
+        }
+
         $this->resetPage();
     }
 
@@ -69,6 +85,19 @@ class DokumentKretanjaTable extends Component
         $this->dispatch('notify', message: 'DOKO dokument je obrisan. Povezani izveštaji su ponovo dostupni.', type: 'success');
     }
 
+    protected function sortColumn(): string
+    {
+        // "Broj izveštaja" se sortira po redni_broj (integer), ne po stringu.
+        return match ($this->sortBy) {
+            'broj_izvestaja' => 'redni_broj',
+            'datum_predaje' => 'datum_predaje',
+            'indeksni_broj' => 'indeksni_broj',
+            'masa_ukupno' => 'masa_ukupno',
+            'broj_dokumenta' => 'broj_dokumenta',
+            default => 'created_at',
+        };
+    }
+
     protected function dokumentQuery()
     {
         if ($this->showAllTeams && auth()->user()?->is_super_admin) {
@@ -86,12 +115,14 @@ class DokumentKretanjaTable extends Component
             ->when($this->search, function ($q) {
                 $q->where(function ($q) {
                     $q->where('broj_dokumenta', 'like', '%'.$this->search.'%')
+                        ->orWhere('broj_izvestaja', 'like', '%'.$this->search.'%')
                         ->orWhere('indeksni_broj', 'like', '%'.$this->search.'%')
                         ->orWhere('vrsta_otpada', 'like', '%'.$this->search.'%')
                         ->orWhere('primalac_naziv', 'like', '%'.$this->search.'%');
                 });
             })
-            ->orderByDesc('created_at')
+            ->orderBy($this->sortColumn(), $this->sortDir === 'asc' ? 'asc' : 'desc')
+            ->orderByDesc('id')
             ->paginate(10);
     }
 

@@ -19,6 +19,10 @@ class DokumentKretanja extends Model
         'team_id',
         'user_id',
         'broj_dokumenta',
+        'broj_izvestaja',
+        'redni_broj',
+        'format_broja',
+        'lokacija_oznaka',
         'indeksni_broj',
         'vrsta_otpada',
         'q_lista',
@@ -103,6 +107,7 @@ class DokumentKretanja extends Model
             'primalac_dozvola_datum' => 'date',
             'primalac_datum_prijema' => 'date',
             'masa_ukupno' => 'decimal:3',
+            'redni_broj' => 'integer',
         ];
     }
 

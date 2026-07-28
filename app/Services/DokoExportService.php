@@ -42,7 +42,9 @@ class DokoExportService
         $sheet->getCell('B8')->setValue($dokument->masa_ukupno);
         $sheet->getCell('B9')->setValue($dokument->nacin_pakovanja ?? '');
         $sheet->getCell('B10')->setValue($this->fizickoStanjeLabel($dokument->fizicko_stanje));
-        $sheet->getCell('C11')->setValue($dokument->izvestaj_broj ?? '');
+        // "Извештај о испитивању отпада — Број": prikaži ručno unet broj ispitivanja
+        // ako postoji, u suprotnom automatski generisan jedinstveni broj izveštaja.
+        $sheet->getCell('C11')->setValue($dokument->izvestaj_broj ?: ($dokument->broj_izvestaja ?? ''));
         $sheet->getCell('C12')->setValue($this->formatDatum($dokument->izvestaj_datum));
         $sheet->getCell('B13')->setValue($dokument->odrediste ?? '');
         $sheet->getCell('B14')->setValue($dokument->vid_prevoza ?? '');

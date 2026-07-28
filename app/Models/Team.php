@@ -37,6 +37,10 @@ class Team extends JetstreamTeam
         'dozvola_broj',
         'dozvola_datum_izdavanja',
         'dozvola_vazi_do',
+        'dko_format_broja',
+        'dko_broj_cifara',
+        'dko_prefix',
+        'dko_lokacije',
     ];
 
     /**
@@ -61,6 +65,39 @@ class Team extends JetstreamTeam
             'personal_team' => 'boolean',
             'dozvola_datum_izdavanja' => 'date',
             'dozvola_vazi_do' => 'date',
+            'dko_broj_cifara' => 'integer',
+            'dko_lokacije' => 'array',
+        ];
+    }
+
+    /**
+     * Podešavanja numeracije DKO broja izveštaja za ovog klijenta.
+     *
+     * @return array{format: string, broj_cifara: int, prefix: string, lokacije: array<int, array{oznaka: string, naziv: string}>}
+     */
+    public function dkoNumeracija(): array
+    {
+        $format = in_array($this->dko_format_broja, ['osnovni', 'lokacija', 'vremenski'], true)
+            ? $this->dko_format_broja
+            : 'osnovni';
+
+        $brojCifara = (int) ($this->dko_broj_cifara ?: 3);
+        $brojCifara = max(2, min(6, $brojCifara));
+
+        $lokacije = collect($this->dko_lokacije ?? [])
+            ->map(fn ($l) => [
+                'oznaka' => trim((string) ($l['oznaka'] ?? '')),
+                'naziv' => trim((string) ($l['naziv'] ?? '')),
+            ])
+            ->filter(fn ($l) => $l['oznaka'] !== '')
+            ->values()
+            ->all();
+
+        return [
+            'format' => $format,
+            'broj_cifara' => $brojCifara,
+            'prefix' => trim((string) ($this->dko_prefix ?? '')),
+            'lokacije' => $lokacije,
         ];
     }
 

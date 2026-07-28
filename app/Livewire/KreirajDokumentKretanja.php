@@ -8,7 +8,9 @@ use App\Models\Operater;
 use App\Models\Team;
 use App\Models\ZahtevPredaje;
 use App\Notifications\ZahtevObradjeni;
+use App\Services\BrojIzvestajaService;
 use App\Support\AdminTeamContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -42,6 +44,16 @@ class KreirajDokumentKretanja extends Component
     public string $izvestaj_broj = '';
 
     public string $izvestaj_datum = '';
+
+    // Automatski broj izveštaja (jedinstveni broj DOKO dokumenta)
+    public string $brojIzvestajaPreview = '';
+
+    public string $formatBroja = 'osnovni';
+
+    public string $brojIzvestajaLokacija = '';
+
+    /** @var array<int, array{oznaka: string, naziv: string}> */
+    public array $lokacijeOpcije = [];
 
     public string $odrediste = '';
 
@@ -198,6 +210,7 @@ class KreirajDokumentKretanja extends Component
         $this->ensureCanManageDoko();
         $this->resetForm();
         $this->fillFromTeam();
+        $this->loadNumeracija();
         $this->datum_predaje = now()->toDateString();
         $this->showModal = true;
     }
@@ -216,6 +229,7 @@ class KreirajDokumentKretanja extends Component
         $this->zahtevId = $zahtev->id;
         $this->teamId = $zahtev->team_id;
         $this->fillFromTeam();
+        $this->loadNumeracija();
         $this->datum_predaje = now()->toDateString();
 
         $this->izabraniIds = $zahtev->evidencije->pluck('id')->all();
@@ -237,6 +251,53 @@ class KreirajDokumentKretanja extends Component
     {
         $this->showModal = false;
         $this->resetForm();
+    }
+
+    /**
+     * Učitava podešavanja numeracije za aktivnog klijenta i osvežava preview broja.
+     */
+    private function loadNumeracija(): void
+    {
+        $teamId = $this->actingTeamId();
+
+        if (! $teamId) {
+            $this->formatBroja = 'osnovni';
+            $this->lokacijeOpcije = [];
+            $this->brojIzvestajaLokacija = '';
+            $this->brojIzvestajaPreview = '';
+
+            return;
+        }
+
+        $settings = app(BrojIzvestajaService::class)->settingsForTeam(Team::find($teamId));
+
+        $this->formatBroja = $settings['format'];
+        $this->lokacijeOpcije = $settings['lokacije'];
+        $this->brojIzvestajaLokacija = $settings['lokacije'][0]['oznaka'] ?? '';
+
+        $this->refreshBrojPreview();
+    }
+
+    /**
+     * Osvežava preview broja izveštaja (dugme 🔄 i promena lokacije).
+     */
+    public function refreshBrojPreview(): void
+    {
+        $teamId = $this->actingTeamId();
+
+        if (! $teamId) {
+            $this->brojIzvestajaPreview = '';
+
+            return;
+        }
+
+        $this->brojIzvestajaPreview = app(BrojIzvestajaService::class)
+            ->previewBroj($teamId, $this->brojIzvestajaLokacija ?: null);
+    }
+
+    public function updatedBrojIzvestajaLokacija(): void
+    {
+        $this->refreshBrojPreview();
     }
 
     public function updatedOperaterSearch(string $value): void
@@ -436,55 +497,80 @@ class KreirajDokumentKretanja extends Component
 
         $zahtevId = $this->zahtevId;
 
-        $dokument = DB::transaction(function () use ($teamId, $masa, $evidencije, $zahtevId) {
-            $dokument = DokumentKretanja::create($this->dokumentPayload($teamId, $masa));
+        $lokacija = $this->brojIzvestajaLokacija ?: null;
+        $dokument = null;
+        $pokusaj = 0;
 
-            foreach ($evidencije as $evidencija) {
-                $evidencija->update([
-                    'predat_operateru' => true,
-                    'dokument_kretanja_id' => $dokument->id,
-                    'datum_predaje_operateru' => $this->datum_predaje,
-                    'operater_naziv' => $this->primalac_naziv,
-                    'operater_dozvola_broj' => $this->primalac_dozvola_broj,
-                    'predat_operateru_r' => $this->r_oznaka !== '',
-                    'predat_operateru_d' => $this->d_oznaka !== '',
-                    'r_oznaka' => $this->r_oznaka ?: null,
-                    'd_oznaka' => $this->d_oznaka ?: null,
-                    'naziv_primaoca' => $this->primalac_naziv,
-                    'broj_dozvole_primaoca' => $this->primalac_dozvola_broj,
-                    'predata_kolicina' => $evidencija->stanje_na_skladistu,
-                    'stanje_na_skladistu' => 0,
-                ]);
-            }
+        // Retry na duplicate key (edge case pri ekstremnom load-u uprkos lockForUpdate).
+        do {
+            $pokusaj++;
 
-            if ($zahtevId) {
-                $zahtev = ZahtevPredaje::with('user')->find($zahtevId);
+            try {
+                $dokument = DB::transaction(function () use ($teamId, $masa, $evidencije, $zahtevId, $lokacija) {
+                    $brojPodaci = app(BrojIzvestajaService::class)->generateBroj($teamId, $lokacija);
 
-                if ($zahtev && ! in_array($zahtev->status, ['zavrseno', 'odbijeno'], true)) {
-                    $zahtev->update([
-                        'status' => 'zavrseno',
-                        'dokument_kretanja_id' => $dokument->id,
-                        'admin_id' => auth()->id(),
-                        'admin_odgovorio_at' => now(),
-                    ]);
+                    $dokument = DokumentKretanja::create(
+                        array_merge($this->dokumentPayload($teamId, $masa), $brojPodaci)
+                    );
 
-                    $zahtev->user->notify(new ZahtevObradjeni($zahtev, $dokument));
+                    foreach ($evidencije as $evidencija) {
+                        $evidencija->update([
+                            'predat_operateru' => true,
+                            'dokument_kretanja_id' => $dokument->id,
+                            'datum_predaje_operateru' => $this->datum_predaje,
+                            'operater_naziv' => $this->primalac_naziv,
+                            'operater_dozvola_broj' => $this->primalac_dozvola_broj,
+                            'predat_operateru_r' => $this->r_oznaka !== '',
+                            'predat_operateru_d' => $this->d_oznaka !== '',
+                            'r_oznaka' => $this->r_oznaka ?: null,
+                            'd_oznaka' => $this->d_oznaka ?: null,
+                            'naziv_primaoca' => $this->primalac_naziv,
+                            'broj_dozvole_primaoca' => $this->primalac_dozvola_broj,
+                            'predata_kolicina' => $evidencija->stanje_na_skladistu,
+                            'stanje_na_skladistu' => 0,
+                        ]);
+                    }
+
+                    if ($zahtevId) {
+                        $zahtev = ZahtevPredaje::with('user')->find($zahtevId);
+
+                        if ($zahtev && ! in_array($zahtev->status, ['zavrseno', 'odbijeno'], true)) {
+                            $zahtev->update([
+                                'status' => 'zavrseno',
+                                'dokument_kretanja_id' => $dokument->id,
+                                'admin_id' => auth()->id(),
+                                'admin_odgovorio_at' => now(),
+                            ]);
+
+                            $zahtev->user->notify(new ZahtevObradjeni($zahtev, $dokument));
+                        }
+                    }
+
+                    return $dokument;
+                });
+
+                break;
+            } catch (QueryException $e) {
+                if ($pokusaj >= 3 || $e->getCode() !== '23000') {
+                    throw $e;
                 }
-            }
 
-            return $dokument;
-        });
+                usleep(50_000 * $pokusaj);
+            }
+        } while ($pokusaj < 3);
+
+        abort_unless($dokument, 500, 'Nije moguće generisati jedinstveni broj izveštaja. Pokušajte ponovo.');
 
         $this->showModal = false;
         $this->resetForm();
         $this->dispatch('dokumentKreiran');
         $this->dispatch('evidencijaUpdated');
         $this->dispatch('zahtevPoslat');
-        $this->dispatch('notify', message: "Dokument {$dokument->broj_dokumenta} je kreiran. Preuzimanje DOKO.xlsx...", type: 'success');
+        $this->dispatch('notify', message: "✅ DOKO dokument kreiran — Broj izveštaja: {$dokument->broj_izvestaja}. Preuzimanje DOKO.xlsx...", type: 'success');
         $this->dispatch('download-file', url: route('doko.download', $dokument));
 
         if ($zahtevId) {
-            session()->flash('success', "DOKO dokument {$dokument->broj_dokumenta} je kreiran i klijent je obavešten.");
+            session()->flash('success', "DOKO dokument kreiran — Broj izveštaja: {$dokument->broj_izvestaja} (interni: {$dokument->broj_dokumenta}). Klijent je obavešten.");
             $this->redirect(route('admin.zahtevi.show', $zahtevId), navigate: true);
 
             return;
@@ -814,6 +900,7 @@ class KreirajDokumentKretanja extends Component
             'currentStep', 'izabraniIds', 'filterIndeks', 'lockedIndeksniBroj',
             'indeksni_broj', 'vrsta_otpada', 'q_lista', 'nacin_pakovanja', 'fizicko_stanje',
             'izvestaj_broj', 'izvestaj_datum', 'odrediste', 'vid_prevoza', 'posebne_napomene',
+            'brojIzvestajaPreview', 'brojIzvestajaLokacija', 'formatBroja', 'lokacijeOpcije',
             'proizvodjac_pib', 'proizvodjac_maticni', 'proizvodjac_naziv', 'proizvodjac_opstina',
             'proizvodjac_mesto', 'proizvodjac_postanski', 'proizvodjac_ulica', 'proizvodjac_telefon',
             'proizvodjac_faks', 'proizvodjac_email', 'vlasnik_tip', 'r_oznaka', 'd_oznaka',

@@ -83,4 +83,8 @@
             </div>
         </div>
     </div>
+
+    <div class="mb-6">
+        <livewire:admin.dko-numeracija-settings :team="$team" :key="'dko-num-'.$team->id" />
+    </div>
 </x-layouts.admin>

@@ -25,6 +25,45 @@
                 </div>
 
                 <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                    {{-- Broj izveštaja (automatski dodeljen) --}}
+                    <div class="mb-5 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-4">
+                        <div class="flex flex-col sm:flex-row sm:items-end gap-3">
+                            @if ($formatBroja === 'lokacija')
+                                <div class="sm:w-52">
+                                    <label class="block text-xs font-semibold uppercase tracking-wide text-indigo-700 mb-1">Lokacija / pogon</label>
+                                    <select wire:model.live="brojIzvestajaLokacija"
+                                        class="w-full rounded-lg border-indigo-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        @forelse ($lokacijeOpcije as $lok)
+                                            <option value="{{ $lok['oznaka'] }}">{{ $lok['oznaka'] }}{{ $lok['naziv'] ? ' — '.$lok['naziv'] : '' }}</option>
+                                        @empty
+                                            <option value="">Nema definisanih lokacija</option>
+                                        @endforelse
+                                    </select>
+                                </div>
+                            @endif
+                            <div class="flex-1">
+                                <label class="block text-xs font-semibold uppercase tracking-wide text-indigo-700 mb-1">Broj izveštaja</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="text" readonly value="{{ $brojIzvestajaPreview }}" placeholder="—"
+                                        class="flex-1 rounded-lg border-indigo-200 bg-white font-mono text-base font-semibold text-gray-900 focus:border-indigo-500 focus:ring-indigo-500" />
+                                    <button type="button" wire:click="refreshBrojPreview" title="Osveži broj" wire:loading.attr="disabled" wire:target="refreshBrojPreview"
+                                        class="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-lg border border-indigo-200 bg-white text-indigo-600 hover:bg-indigo-100 transition-colors disabled:opacity-50">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                            class="w-5 h-5" wire:loading.class="animate-spin" wire:target="refreshBrojPreview">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-indigo-400 shrink-0">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd" />
+                            </svg>
+                            Broj se zvanično dodeljuje u trenutku čuvanja dokumenta.
+                        </p>
+                    </div>
+
                     @if ($errors->any())
                         <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                             @foreach ($errors->all() as $error)
@@ -124,19 +163,19 @@
                     @if ($currentStep === 3)
                         <h3 class="font-semibold text-gray-900 mb-2">DEO B — Proizvođač</h3>
                         <p class="text-sm text-green-800 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-4">
-                            Podaci su automatski preuzeti iz profila firme klijenta. Ako nešto nedostaje, klijent može dopuniti u Podešavanjima firme.
+                            Podaci se automatski preuzimaju iz profila firme klijenta. Ako nešto nedostaje ili je pogrešno, možete dopuniti/izmeniti direktno ovde — izmene se čuvaju samo na ovom dokumentu.
                         </p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div><label class="text-sm text-gray-600">PIB</label><input type="text" readonly wire:model="proizvodjac_pib" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
-                            <div><label class="text-sm text-gray-600">Matični broj</label><input type="text" readonly wire:model="proizvodjac_maticni" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
-                            <div class="sm:col-span-2"><label class="text-sm text-gray-600">Naziv *</label><input type="text" readonly wire:model="proizvodjac_naziv" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
-                            <div><label class="text-sm text-gray-600">Opština</label><input type="text" readonly wire:model="proizvodjac_opstina" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
-                            <div><label class="text-sm text-gray-600">Mesto</label><input type="text" readonly wire:model="proizvodjac_mesto" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
-                            <div><label class="text-sm text-gray-600">Poštanski broj</label><input type="text" readonly wire:model="proizvodjac_postanski" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
-                            <div><label class="text-sm text-gray-600">Ulica</label><input type="text" readonly wire:model="proizvodjac_ulica" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
-                            <div><label class="text-sm text-gray-600">Telefon</label><input type="text" readonly wire:model="proizvodjac_telefon" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
-                            <div><label class="text-sm text-gray-600">Faks</label><input type="text" readonly wire:model="proizvodjac_faks" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
-                            <div><label class="text-sm text-gray-600">Email</label><input type="email" readonly wire:model="proizvodjac_email" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">PIB</label><input type="text" wire:model="proizvodjac_pib" maxlength="9" inputmode="numeric" class="mt-1 w-full rounded-lg border-gray-300 text-sm font-mono" /></div>
+                            <div><label class="text-sm text-gray-600">Matični broj</label><input type="text" wire:model="proizvodjac_maticni" maxlength="8" inputmode="numeric" class="mt-1 w-full rounded-lg border-gray-300 text-sm font-mono" /></div>
+                            <div class="sm:col-span-2"><label class="text-sm text-gray-600">Naziv *</label><input type="text" wire:model="proizvodjac_naziv" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">Opština</label><input type="text" wire:model="proizvodjac_opstina" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">Mesto</label><input type="text" wire:model="proizvodjac_mesto" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">Poštanski broj</label><input type="text" wire:model="proizvodjac_postanski" maxlength="5" inputmode="numeric" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">Ulica</label><input type="text" wire:model="proizvodjac_ulica" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">Telefon</label><input type="text" wire:model="proizvodjac_telefon" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">Faks</label><input type="text" wire:model="proizvodjac_faks" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">Email</label><input type="email" wire:model="proizvodjac_email" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
                             <div class="sm:col-span-2">
                                 <label class="text-sm text-gray-600 block mb-2">Vlasnik</label>
                                 <div class="flex flex-wrap gap-4 text-sm">
@@ -147,11 +186,11 @@
                             </div>
                             <div><label class="text-sm text-gray-600">R oznaka</label><select wire:model="r_oznaka" class="mt-1 w-full rounded-lg border-gray-300 text-sm"><option value="">—</option>@foreach($rOznake as $o)<option value="{{ $o }}">{{ $o }}</option>@endforeach</select></div>
                             <div><label class="text-sm text-gray-600">D oznaka</label><select wire:model="d_oznaka" class="mt-1 w-full rounded-lg border-gray-300 text-sm"><option value="">—</option>@foreach($dOznake as $o)<option value="{{ $o }}">{{ $o }}</option>@endforeach</select></div>
-                            <div><label class="text-sm text-gray-600">Dozvola — broj</label><input type="text" readonly wire:model="dozvola_broj" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
-                            <div><label class="text-sm text-gray-600">Dozvola — datum izdavanja</label><input type="date" readonly wire:model="dozvola_datum" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">Dozvola — broj</label><input type="text" wire:model="dozvola_broj" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">Dozvola — datum izdavanja</label><input type="date" wire:model="dozvola_datum" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
                             <div><label class="text-sm text-gray-600">Datum predaje otpada *</label><input type="date" wire:model="datum_predaje" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
-                            <div><label class="text-sm text-gray-600">Odgovorno lice</label><input type="text" readonly wire:model="odgovorno_lice_b" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
-                            <div><label class="text-sm text-gray-600">Telefon lica</label><input type="text" readonly wire:model="telefon_lica_b" class="mt-1 w-full rounded-lg border-gray-200 bg-gray-50 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">Odgovorno lice</label><input type="text" wire:model="odgovorno_lice_b" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
+                            <div><label class="text-sm text-gray-600">Telefon lica</label><input type="text" wire:model="telefon_lica_b" class="mt-1 w-full rounded-lg border-gray-300 text-sm" /></div>
                         </div>
                     @endif
 

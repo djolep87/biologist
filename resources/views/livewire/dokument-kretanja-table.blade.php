@@ -6,7 +6,7 @@
         </div>
 
         <div class="px-6 py-4 bg-[#f8f9f4] border-b border-gray-100">
-            <input type="text" wire:model.live.debounce.300ms="search" placeholder="Pretraži po broju dokumenta, indeksu, primaocu..."
+            <input type="text" wire:model.live.debounce.300ms="search" placeholder="Pretraži po broju izveštaja, broju dokumenta, indeksu, primaocu..."
                 class="w-full max-w-md rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 text-sm" />
         </div>
 
@@ -18,10 +18,20 @@
         @else
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    @php
+                        $sortIcon = fn ($col) => $sortBy === $col ? ($sortDir === 'asc' ? '▲' : '▼') : '';
+                    @endphp
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Br. dokumenta</th>
-                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Datum predaje</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer select-none hover:text-gray-900" wire:click="sort('broj_izvestaja')">
+                                Broj izveštaja <span class="text-green-600">{{ $sortIcon('broj_izvestaja') }}</span>
+                            </th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer select-none hover:text-gray-900" wire:click="sort('broj_dokumenta')">
+                                Br. dokumenta <span class="text-green-600">{{ $sortIcon('broj_dokumenta') }}</span>
+                            </th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700 cursor-pointer select-none hover:text-gray-900" wire:click="sort('datum_predaje')">
+                                Datum predaje <span class="text-green-600">{{ $sortIcon('datum_predaje') }}</span>
+                            </th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Indeksni br.</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Vrsta otpada</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Masa (t)</th>
@@ -36,6 +46,7 @@
                     <tbody class="divide-y divide-gray-100">
                         @foreach ($dokumenti as $dok)
                             <tr class="hover:bg-gray-50/80" wire:key="dokument-{{ $dok->id }}">
+                                <td class="px-4 py-3 font-mono text-sm font-bold text-indigo-700">{{ $dok->broj_izvestaja ?: '—' }}</td>
                                 <td class="px-4 py-3 font-mono text-xs font-semibold text-gray-900">{{ $dok->broj_dokumenta }}</td>
                                 <td class="px-4 py-3 text-gray-700">{{ $dok->datum_predaje?->format('d.m.Y.') }}</td>
                                 <td class="px-4 py-3 font-mono text-xs">{{ $dok->indeksni_broj }}</td>
@@ -91,7 +102,14 @@
             <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col">
                 <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div>
-                        <h3 class="font-semibold text-gray-900">{{ $pregledDokument->broj_dokumenta }}</h3>
+                        <h3 class="font-semibold text-gray-900">
+                            @if ($pregledDokument->broj_izvestaja)
+                                <span class="font-mono text-indigo-700">{{ $pregledDokument->broj_izvestaja }}</span>
+                                <span class="text-gray-400 font-normal text-sm">· {{ $pregledDokument->broj_dokumenta }}</span>
+                            @else
+                                {{ $pregledDokument->broj_dokumenta }}
+                            @endif
+                        </h3>
                         <p class="text-sm text-gray-500">Vezani dnevni izveštaji ({{ $pregledDokument->dnevneEvidencije->count() }})</p>
                     </div>
                     <button type="button" wire:click="closePregled" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
