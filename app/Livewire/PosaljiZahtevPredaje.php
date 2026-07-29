@@ -112,6 +112,7 @@ class PosaljiZahtevPredaje extends Component
         }
 
         $evidencije = DnevnaEvidencija::forTeam($teamId)
+            ->obicna()
             ->whereIn('id', $this->izabraniIds)
             ->where('predat_operateru', false)
             ->whereDoesntHave('zahtevi', fn ($q) => $q->whereIn('status', ['na_cekanju', 'u_obradi', 'odbijeno']))
@@ -157,6 +158,7 @@ class PosaljiZahtevPredaje extends Component
     public function getEvidencijeProperty(): Collection
     {
         return DnevnaEvidencija::forTeam()
+            ->obicna()
             ->where('predat_operateru', false)
             ->whereDoesntHave('zahtevi', fn ($q) => $q->whereIn('status', ['na_cekanju', 'u_obradi', 'odbijeno']))
             ->when($this->filterIndeksni, fn ($q) => $q->where('indeksni_broj', $this->filterIndeksni))
@@ -168,6 +170,7 @@ class PosaljiZahtevPredaje extends Component
     public function getIndeksniBrojeviProperty(): Collection
     {
         return DnevnaEvidencija::forTeam()
+            ->obicna()
             ->where('predat_operateru', false)
             ->whereDoesntHave('zahtevi', fn ($q) => $q->whereIn('status', ['na_cekanju', 'u_obradi', 'odbijeno']))
             ->select('indeksni_broj', 'naziv_otpada')

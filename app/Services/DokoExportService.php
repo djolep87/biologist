@@ -14,6 +14,8 @@ class DokoExportService
 
     public function download(DokumentKretanja $dokument): StreamedResponse
     {
+        $this->assertCanExportGradjevinski($dokument);
+
         $spreadsheet = $this->fillTemplate($dokument);
 
         $filename = 'DOKO_'.$this->safeFilename($dokument->broj_dokumenta).'.xlsx';
@@ -28,6 +30,8 @@ class DokoExportService
 
     public function fillTemplate(DokumentKretanja $dokument): Spreadsheet
     {
+        $this->assertCanExportGradjevinski($dokument);
+
         $path = storage_path('app/'.self::TEMPLATE_PATH);
 
         abort_unless(is_file($path), 500, 'DOKO šablon nije pronađen (storage/app/templates/Doko.xlsx).');
@@ -85,7 +89,7 @@ class DokoExportService
         $sheet->getCell('C52')->setValue($dokument->prevoznik_email ?? '');
         $sheet->getCell('C53')->setValue($dokument->vrsta_prevoznog_sredstva ?? '');
         $sheet->getCell('C54')->setValue($dokument->registarski_broj ?? '');
-        $sheet->getCell('D55')->setValue($dokument->lokacija_utovara ?? '');
+        $sheet->getCell('D55')->setValue($dokument->lokacija_nastanka_za_export);
         $sheet->getCell('D56')->setValue($dokument->ruta_via_1 ?? '');
         $sheet->getCell('D57')->setValue($dokument->ruta_via_2 ?? '');
         $sheet->getCell('D58')->setValue($dokument->ruta_via_3 ?? '');
@@ -120,6 +124,22 @@ class DokoExportService
         $sheet->getCell('D94')->setValue($dokument->primalac_telefon_lica ?? '');
 
         return $spreadsheet;
+    }
+
+    private function assertCanExportGradjevinski(DokumentKretanja $dokument): void
+    {
+        if (! $dokument->isGradjevinski()) {
+            return;
+        }
+
+        $dozvola = trim((string) ($dokument->broj_gradevinske_dozvole_dko ?? ''));
+
+        if ($dozvola === '' && $dokument->constructionSite) {
+            $dozvola = trim((string) $dokument->constructionSite->broj_gradevinske_dozvole);
+        }
+
+        abort_if($dozvola === '', 422,
+            '❌ Nije moguće generisati DKO – gradilište nema unesen broj građevinske dozvole. Uredite gradilište i dodajte broj dozvole.');
     }
 
     private function formatDatum(mixed $datum): string

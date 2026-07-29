@@ -76,6 +76,42 @@
                     @if ($currentStep === 1)
                         <h3 class="font-semibold text-gray-900 mb-4">Izaberite dnevne izveštaje za predaju operateru</h3>
 
+                        <div class="mb-5 rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+                            <p class="text-sm font-semibold text-gray-800">Tip evidencije</p>
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                    <input type="radio" wire:model.live="tipEvidencije" value="obicna" class="text-green-600 focus:ring-green-500">
+                                    Obična firma (postojeća logika)
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                    <input type="radio" wire:model.live="tipEvidencije" value="gradjevinska" class="text-green-600 focus:ring-green-500">
+                                    Građevinsko gradilište
+                                </label>
+                            </div>
+
+                            @if ($tipEvidencije === 'gradjevinska')
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Gradilište</label>
+                                    <select wire:model.live="constructionSiteId" class="w-full rounded-lg border-gray-300 text-sm">
+                                        <option value="">Izaberite gradilište…</option>
+                                        @foreach ($gradilistaOpcije as $g)
+                                            <option value="{{ $g['id'] }}">
+                                                {{ $g['naziv_gradilista'] }} – {{ $g['broj_gradevinske_dozvole'] }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @if ($brojGradevinskeDozvole)
+                                        <p class="mt-2 text-xs text-indigo-700 font-medium">
+                                            Broj građevinske dozvole: {{ $brojGradevinskeDozvole }} — automatski na DKO obrascu
+                                        </p>
+                                    @endif
+                                    @if ($gradilistaOpcije === [])
+                                        <p class="mt-2 text-xs text-amber-700">Firma nema unetih gradilišta.</p>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
+
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 mb-1">Filter po indeksnom broju</label>
                             <select wire:model.live="filterIndeks" class="w-full rounded-lg border-gray-300 text-sm" @disabled($lockedIndeksniBroj !== null)>
@@ -283,13 +319,19 @@
                     @if ($currentStep === 5)
                         <h3 class="font-semibold text-gray-900 mb-4">DEO D — Primalac</h3>
 
+                        @if ($tipEvidencije === 'gradjevinska')
+                            <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                Unesite naziv deponije ili drobilice gde se šut istovara. Prevoznik je automatski popunjen iz podataka gradilišta (ako postoji).
+                            </div>
+                        @endif
+
                         <div class="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
                             <label class="block text-sm font-semibold text-indigo-900 mb-2">
                                 🔍 Brzo popunjavanje — izaberite operatera iz baze
                             </label>
                             <div class="flex gap-3">
                                 <input type="text" wire:model.live.debounce.300ms="operaterSearch"
-                                    placeholder="Unesite naziv ili PIB operatera..."
+                                    placeholder="{{ $tipEvidencije === 'gradjevinska' ? 'Unesite naziv deponije ili drobilice...' : 'Unesite naziv ili PIB operatera...' }}"
                                     class="flex-1 rounded-lg border-indigo-300 text-sm focus:ring-indigo-500" />
                                 <button type="button" wire:click="clearOperater"
                                     class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap">

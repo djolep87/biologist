@@ -5,7 +5,15 @@
             <p class="text-sm text-gray-500 mt-1">Pregled, preuzimanje i brisanje DOKO i DEO1 obrazaca.</p>
         </div>
 
-        <div class="px-6 py-4 bg-[#f8f9f4] border-b border-gray-100">
+        <div class="px-6 py-4 bg-[#f8f9f4] border-b border-gray-100 space-y-3">
+            <div class="flex flex-wrap gap-2">
+                @foreach (['' => 'Svi DKO', 'obicni' => 'Komunalni/Industrijski', 'gradjevinski' => 'Građevinski'] as $value => $label)
+                    <button type="button" wire:click="setFilterTip('{{ $value }}')"
+                        class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors {{ $filterTip === $value ? 'bg-[#1e2430] text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50' }}">
+                        {{ $label }}
+                    </button>
+                @endforeach
+            </div>
             <input type="text" wire:model.live.debounce.300ms="search" placeholder="Pretraži po broju izveštaja, broju dokumenta, indeksu, primaocu..."
                 class="w-full max-w-md rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 text-sm" />
         </div>
@@ -34,6 +42,7 @@
                             </th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Indeksni br.</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Vrsta otpada</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700">Tip</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Masa (t)</th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700">Primalac</th>
                             @if ($showAllTeams)
@@ -51,6 +60,13 @@
                                 <td class="px-4 py-3 text-gray-700">{{ $dok->datum_predaje?->format('d.m.Y.') }}</td>
                                 <td class="px-4 py-3 font-mono text-xs">{{ $dok->indeksni_broj }}</td>
                                 <td class="px-4 py-3 text-gray-700 max-w-[160px] truncate" title="{{ $dok->vrsta_otpada }}">{{ $dok->vrsta_otpada }}</td>
+                                <td class="px-4 py-3">
+                                    @if ($dok->isGradjevinski())
+                                        <span class="inline-flex text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-800" title="{{ $dok->broj_gradevinske_dozvole_dko }}">Građ.</span>
+                                    @else
+                                        <span class="inline-flex text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Obični</span>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-3 text-gray-900 font-medium">{{ number_format((float) $dok->masa_ukupno, 3, ',', '.') }}</td>
                                 <td class="px-4 py-3 text-gray-700 max-w-[140px] truncate">{{ $dok->primalac_naziv ?: '—' }}</td>
                                 @if ($showAllTeams)

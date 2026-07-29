@@ -2,11 +2,15 @@
 
 namespace App\Livewire;
 
+use App\Models\ConstructionSite;
 use App\Models\DnevnaEvidencija;
 use App\Models\DokumentKretanja;
+use App\Models\GradjevinskiDkoZahtev;
+use App\Models\KatalogOtpadaGrupa17;
 use App\Models\Operater;
 use App\Models\Team;
 use App\Models\ZahtevPredaje;
+use App\Notifications\GradjevinskiDkoZahtevObradjen;
 use App\Notifications\ZahtevObradjeni;
 use App\Services\BrojIzvestajaService;
 use App\Support\AdminTeamContext;
@@ -204,12 +208,25 @@ class KreirajDokumentKretanja extends Component
 
     public ?int $zahtevId = null;
 
+    public ?int $gradjevinskiZahtevId = null;
+
+    /** Tip evidencije: obicna | gradjevinska */
+    public string $tipEvidencije = 'obicna';
+
+    public ?int $constructionSiteId = null;
+
+    public string $brojGradevinskeDozvole = '';
+
+    /** @var array<int, array{id: int, naziv_gradilista: string, broj_gradevinske_dozvole: string}> */
+    public array $gradilistaOpcije = [];
+
     #[On('openDokoForm')]
     public function openModal(): void
     {
         $this->ensureCanManageDoko();
         $this->resetForm();
         $this->fillFromTeam();
+        $this->loadGradilista();
         $this->loadNumeracija();
         $this->datum_predaje = now()->toDateString();
         $this->showModal = true;
@@ -228,7 +245,18 @@ class KreirajDokumentKretanja extends Component
         $this->resetForm();
         $this->zahtevId = $zahtev->id;
         $this->teamId = $zahtev->team_id;
+
+        $firstEv = $zahtev->evidencije->first();
+        if ($firstEv?->construction_site_id) {
+            $this->tipEvidencije = 'gradjevinska';
+            $this->constructionSiteId = $firstEv->construction_site_id;
+        }
+
         $this->fillFromTeam();
+        $this->loadGradilista();
+        if ($this->constructionSiteId) {
+            $this->applyConstructionSite();
+        }
         $this->loadNumeracija();
         $this->datum_predaje = now()->toDateString();
 
@@ -242,6 +270,66 @@ class KreirajDokumentKretanja extends Component
         $first = $zahtev->evidencije->first();
         if ($first) {
             $this->fizicko_stanje = $first->fizicko_stanje ?? '';
+        }
+
+        $this->showModal = true;
+    }
+
+    #[On('openDokoFormFromGradjevinskiZahtev')]
+    public function openFromGradjevinskiZahtev(int $zahtevId): void
+    {
+        $this->ensureCanManageDoko();
+
+        $zahtev = GradjevinskiDkoZahtev::with(['evidencije', 'constructionSite'])->findOrFail($zahtevId);
+        abort_if(in_array($zahtev->status, ['zavrseno', 'odbijeno'], true), 422, 'Zahtev je već obrađen.');
+
+        $site = $zahtev->constructionSite;
+        abort_unless($site, 422, 'Zahtev nema vezano gradilište.');
+        abort_if(trim((string) $site->broj_gradevinske_dozvole) === '', 422,
+            '❌ Nije moguće generisati DKO – gradilište nema unesen broj građevinske dozvole.');
+
+        $this->resetForm();
+        $this->gradjevinskiZahtevId = $zahtev->id;
+        $this->teamId = $zahtev->team_id;
+        $this->tipEvidencije = 'gradjevinska';
+        $this->constructionSiteId = $site->id;
+
+        AdminTeamContext::select($zahtev->team_id);
+
+        $this->fillFromTeam();
+        $this->loadGradilista();
+        $this->applyConstructionSite();
+        $this->loadNumeracija();
+        $this->datum_predaje = now()->toDateString();
+
+        $this->izabraniIds = $zahtev->evidencije->pluck('id')->all();
+
+        $indeksi = $zahtev->evidencije->pluck('indeksni_broj')->unique()->values();
+        $first = $zahtev->evidencije->first();
+
+        if ($indeksi->count() === 1) {
+            $this->lockedIndeksniBroj = $indeksi->first();
+            $this->indeksni_broj = $indeksi->first();
+            $this->vrsta_otpada = $first?->naziv_otpada ?? '';
+            $this->filterIndeks = $indeksi->first();
+        } else {
+            $this->lockedIndeksniBroj = null;
+            $this->indeksni_broj = $indeksi->first() ?? '';
+            $this->vrsta_otpada = 'Više vrsta građevinskog otpada';
+            $this->filterIndeks = '';
+            $lista = $zahtev->evidencije
+                ->map(fn ($e) => $e->indeksni_broj.' – '.$e->naziv_otpada.' ('.number_format((float) $e->proizvedena_kolicina, 3, ',', '.').' t)')
+                ->implode('; ');
+            $napomena = trim(($zahtev->napomena_klijenta ? $zahtev->napomena_klijenta."\n" : '').'DEO1 u zahtevu: '.$lista);
+            $this->posebne_napomene = $napomena;
+        }
+
+        if ($first) {
+            $this->fizicko_stanje = $first->fizicko_stanje ?? '';
+        }
+
+        if ($zahtev->napomena_klijenta && $indeksi->count() === 1) {
+            $this->posebne_napomene = $zahtev->napomena_klijenta;
         }
 
         $this->showModal = true;
@@ -298,6 +386,25 @@ class KreirajDokumentKretanja extends Component
     public function updatedBrojIzvestajaLokacija(): void
     {
         $this->refreshBrojPreview();
+    }
+
+    public function updatedTipEvidencije(): void
+    {
+        $this->izabraniIds = [];
+        $this->lockedIndeksniBroj = null;
+        $this->filterIndeks = '';
+        $this->constructionSiteId = null;
+        $this->brojGradevinskeDozvole = '';
+        $this->fillFromTeam();
+        $this->loadGradilista();
+    }
+
+    public function updatedConstructionSiteId(): void
+    {
+        $this->izabraniIds = [];
+        $this->lockedIndeksniBroj = null;
+        $this->filterIndeks = '';
+        $this->applyConstructionSite();
     }
 
     public function updatedOperaterSearch(string $value): void
@@ -445,7 +552,7 @@ class KreirajDokumentKretanja extends Component
             $this->indeksni_broj = $evidencija->indeksni_broj;
             $this->vrsta_otpada = $evidencija->naziv_otpada;
             $this->fizicko_stanje = $evidencija->fizicko_stanje;
-        } elseif ($evidencija->indeksni_broj !== $this->lockedIndeksniBroj) {
+        } elseif ($evidencija->indeksni_broj !== $this->lockedIndeksniBroj && ! $this->gradjevinskiZahtevId) {
             $this->addError('izabraniIds', 'Svi izveštaji moraju biti istog indeksnog broja.');
 
             return;
@@ -486,16 +593,34 @@ class KreirajDokumentKretanja extends Component
         $evidencije = DnevnaEvidencija::forTeam($teamId)
             ->whereIn('id', $this->izabraniIds)
             ->where('predat_operateru', false)
+            ->when(
+                $this->tipEvidencije === 'gradjevinska',
+                fn ($q) => $q->where('construction_site_id', $this->constructionSiteId),
+                fn ($q) => $q->whereNull('construction_site_id')
+            )
             ->get();
 
         abort_if($evidencije->count() !== count($this->izabraniIds), 422, 'Neki izveštaji više nisu dostupni za predaju.');
 
-        $indeksi = $evidencije->pluck('indeksni_broj')->unique();
-        abort_if($indeksi->count() !== 1, 422, 'Svi izveštaji moraju biti istog indeksnog broja.');
+        if ($this->tipEvidencije === 'gradjevinska') {
+            abort_unless($this->constructionSiteId, 422, 'Izaberite gradilište.');
+            $site = ConstructionSite::findOrFail($this->constructionSiteId);
+            abort_if(trim((string) $site->broj_gradevinske_dozvole) === '', 422,
+                '❌ Nije moguće generisati DKO – gradilište nema unesen broj građevinske dozvole. Uredite gradilište i dodajte broj dozvole.');
+            $this->brojGradevinskeDozvole = $site->broj_gradevinske_dozvole;
+        }
 
-        $masa = (float) $evidencije->sum('stanje_na_skladistu');
+        $indeksi = $evidencije->pluck('indeksni_broj')->unique();
+        if (! $this->gradjevinskiZahtevId) {
+            abort_if($indeksi->count() !== 1, 422, 'Svi izveštaji moraju biti istog indeksnog broja.');
+        }
+
+        $masa = $this->gradjevinskiZahtevId
+            ? (float) $evidencije->sum(fn ($e) => (float) $e->stanje_na_skladistu ?: (float) $e->proizvedena_kolicina)
+            : (float) $evidencije->sum('stanje_na_skladistu');
 
         $zahtevId = $this->zahtevId;
+        $gradjevinskiZahtevId = $this->gradjevinskiZahtevId;
 
         $lokacija = $this->brojIzvestajaLokacija ?: null;
         $dokument = null;
@@ -506,7 +631,7 @@ class KreirajDokumentKretanja extends Component
             $pokusaj++;
 
             try {
-                $dokument = DB::transaction(function () use ($teamId, $masa, $evidencije, $zahtevId, $lokacija) {
+                $dokument = DB::transaction(function () use ($teamId, $masa, $evidencije, $zahtevId, $gradjevinskiZahtevId, $lokacija) {
                     $brojPodaci = app(BrojIzvestajaService::class)->generateBroj($teamId, $lokacija);
 
                     $dokument = DokumentKretanja::create(
@@ -514,6 +639,10 @@ class KreirajDokumentKretanja extends Component
                     );
 
                     foreach ($evidencije as $evidencija) {
+                        $predato = $this->gradjevinskiZahtevId
+                            ? ((float) $evidencija->stanje_na_skladistu ?: (float) $evidencija->proizvedena_kolicina)
+                            : (float) $evidencija->stanje_na_skladistu;
+
                         $evidencija->update([
                             'predat_operateru' => true,
                             'dokument_kretanja_id' => $dokument->id,
@@ -526,8 +655,9 @@ class KreirajDokumentKretanja extends Component
                             'd_oznaka' => $this->d_oznaka ?: null,
                             'naziv_primaoca' => $this->primalac_naziv,
                             'broj_dozvole_primaoca' => $this->primalac_dozvola_broj,
-                            'predata_kolicina' => $evidencija->stanje_na_skladistu,
+                            'predata_kolicina' => $predato,
                             'stanje_na_skladistu' => 0,
+                            'dko_status' => $gradjevinskiZahtevId ? 'dko_kreiran' : $evidencija->dko_status,
                         ]);
                     }
 
@@ -543,6 +673,15 @@ class KreirajDokumentKretanja extends Component
                             ]);
 
                             $zahtev->user->notify(new ZahtevObradjeni($zahtev, $dokument));
+                        }
+                    }
+
+                    if ($gradjevinskiZahtevId) {
+                        $gZahtev = GradjevinskiDkoZahtev::with('kreirao')->find($gradjevinskiZahtevId);
+
+                        if ($gZahtev && ! in_array($gZahtev->status, ['zavrseno', 'odbijeno'], true)) {
+                            $gZahtev->oznaciZavrseno($dokument, $this->posebne_napomene ?: null);
+                            $gZahtev->kreirao?->notify(new GradjevinskiDkoZahtevObradjen($gZahtev->fresh(), $dokument));
                         }
                     }
 
@@ -575,12 +714,22 @@ class KreirajDokumentKretanja extends Component
 
             return;
         }
+
+        if ($gradjevinskiZahtevId) {
+            session()->flash('success', '✅ DKO dokument generisan i klijent je obavešten.');
+            $this->redirect(route('admin.dko-zahtevi.index'), navigate: true);
+        }
     }
 
     public function getAvailableEvidencijeProperty(): Collection
     {
         return DnevnaEvidencija::forTeam($this->actingTeamId())
             ->where('predat_operateru', false)
+            ->when(
+                $this->tipEvidencije === 'gradjevinska',
+                fn ($q) => $q->where('construction_site_id', $this->constructionSiteId ?: -1),
+                fn ($q) => $q->whereNull('construction_site_id')
+            )
             ->when($this->filterIndeks !== '', fn ($q) => $q->where('indeksni_broj', $this->filterIndeks))
             ->when($this->lockedIndeksniBroj, fn ($q) => $q->where('indeksni_broj', $this->lockedIndeksniBroj))
             ->orderBy('indeksni_broj')
@@ -592,6 +741,11 @@ class KreirajDokumentKretanja extends Component
     {
         return DnevnaEvidencija::forTeam($this->actingTeamId())
             ->where('predat_operateru', false)
+            ->when(
+                $this->tipEvidencije === 'gradjevinska',
+                fn ($q) => $q->where('construction_site_id', $this->constructionSiteId ?: -1),
+                fn ($q) => $q->whereNull('construction_site_id')
+            )
             ->select('indeksni_broj')
             ->distinct()
             ->orderBy('indeksni_broj')
@@ -630,17 +784,85 @@ class KreirajDokumentKretanja extends Component
             'selectedEvidencije' => $this->selectedEvidencije,
             'rOznake' => $this->oznake('R', 13),
             'dOznake' => $this->oznake('D', 15),
+            'katalogGrupa17' => $this->tipEvidencije === 'gradjevinska'
+                ? KatalogOtpadaGrupa17::mapaSifraNaziv()
+                : [],
         ]);
+    }
+
+    private function loadGradilista(): void
+    {
+        $teamId = $this->actingTeamId();
+
+        if (! $teamId) {
+            $this->gradilistaOpcije = [];
+
+            return;
+        }
+
+        $this->gradilistaOpcije = ConstructionSite::query()
+            ->where('team_id', $teamId)
+            ->orderBy('naziv_gradilista')
+            ->get(['id', 'naziv_gradilista', 'broj_gradevinske_dozvole', 'status'])
+            ->map(fn (ConstructionSite $s) => [
+                'id' => $s->id,
+                'naziv_gradilista' => $s->naziv_gradilista,
+                'broj_gradevinske_dozvole' => $s->broj_gradevinske_dozvole,
+                'status' => $s->status,
+            ])
+            ->all();
+    }
+
+    private function applyConstructionSite(): void
+    {
+        if (! $this->constructionSiteId) {
+            $this->brojGradevinskeDozvole = '';
+
+            return;
+        }
+
+        $site = ConstructionSite::query()
+            ->where('team_id', $this->actingTeamId())
+            ->find($this->constructionSiteId);
+
+        if (! $site) {
+            $this->constructionSiteId = null;
+            $this->brojGradevinskeDozvole = '';
+
+            return;
+        }
+
+        $this->brojGradevinskeDozvole = $site->broj_gradevinske_dozvole;
+        $this->lokacija_utovara = $site->lokacija_nastanka_sa_dozvolom;
+        $this->proizvodjac_ulica = $site->adresa_gradilista;
+        $this->proizvodjac_mesto = $site->mesto;
+        $this->proizvodjac_opstina = $site->opstina;
+
+        if ($site->investitor_naziv) {
+            $this->proizvodjac_naziv = $site->investitor_naziv;
+        }
+
+        if ($site->operater_naziv) {
+            $this->prevoznik_naziv = $site->operater_naziv;
+            $this->prevoznik_pib = $site->operater_pib ?? '';
+            $this->prevoznik_ulica = $site->operater_adresa ?? '';
+            $this->prevoznik_dozvola_broj = $site->operater_dozvola_broj ?? '';
+        }
     }
 
     private function validateStep(int $step): void
     {
         match ($step) {
-            1 => $this->validate([
+            1 => $this->validate(array_filter([
                 'izabraniIds' => ['required', 'array', 'min:1'],
-            ], [
+                'tipEvidencije' => ['required', Rule::in(['obicna', 'gradjevinska'])],
+                'constructionSiteId' => $this->tipEvidencije === 'gradjevinska'
+                    ? ['required', 'exists:construction_sites,id']
+                    : ['nullable'],
+            ]), [
                 'izabraniIds.required' => 'Izaberite bar jedan dnevni izveštaj.',
                 'izabraniIds.min' => 'Izaberite bar jedan dnevni izveštaj.',
+                'constructionSiteId.required' => 'Izaberite građevinsko gradilište.',
             ]),
             2 => $this->validate([
                 'indeksni_broj' => ['required', 'string'],
@@ -666,6 +888,10 @@ class KreirajDokumentKretanja extends Component
         return [
             'team_id' => $teamId,
             'user_id' => auth()->id(),
+            'construction_site_id' => $this->tipEvidencije === 'gradjevinska' ? $this->constructionSiteId : null,
+            'broj_gradevinske_dozvole_dko' => $this->tipEvidencije === 'gradjevinska'
+                ? ($this->brojGradevinskeDozvole ?: null)
+                : null,
             'indeksni_broj' => $this->indeksni_broj,
             'vrsta_otpada' => $this->vrsta_otpada,
             'q_lista' => $this->q_lista ?: null,
@@ -872,6 +1098,11 @@ class KreirajDokumentKretanja extends Component
     {
         return DnevnaEvidencija::forTeam($this->actingTeamId())
             ->where('predat_operateru', false)
+            ->when(
+                $this->tipEvidencije === 'gradjevinska',
+                fn ($q) => $q->where('construction_site_id', $this->constructionSiteId ?: -1),
+                fn ($q) => $q->whereNull('construction_site_id')
+            )
             ->find($id);
     }
 
@@ -920,10 +1151,13 @@ class KreirajDokumentKretanja extends Component
             'selectedOperaterName', 'operaterRezultati',
             'prevoznikOperaterSearch', 'selectedPrevoznikOperaterId',
             'selectedPrevoznikOperaterName', 'prevoznikOperaterRezultati',
+            'tipEvidencije', 'constructionSiteId', 'brojGradevinskeDozvole', 'gradilistaOpcije',
+            'gradjevinskiZahtevId',
         ]);
 
         $this->currentStep = 1;
         $this->vlasnik_tip = 'proizvodjac';
+        $this->tipEvidencije = 'obicna';
         $this->izabraniIds = [];
     }
 

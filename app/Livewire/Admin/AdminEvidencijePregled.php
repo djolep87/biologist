@@ -83,6 +83,7 @@ class AdminEvidencijePregled extends Component
         }
 
         return DnevnaEvidencija::forTeam($this->teamId)
+            ->obicna()
             ->with('dokumentKretanja')
             ->when($this->filterGodina, fn ($q) => $q->where('godina', $this->filterGodina))
             ->when($this->filterMesec !== '', fn ($q) => $q->where('mesec', (int) $this->filterMesec))

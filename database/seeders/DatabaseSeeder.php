@@ -13,6 +13,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call([
+            KatalogOtpadaGrupa17Seeder::class,
+        ]);
+
         // User::factory(10)->withPersonalTeam()->create();
 
         User::factory()->withPersonalTeam()->create([

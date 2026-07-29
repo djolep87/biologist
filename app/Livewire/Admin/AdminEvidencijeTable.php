@@ -137,6 +137,7 @@ class AdminEvidencijeTable extends Component
     protected function baseQuery()
     {
         return DnevnaEvidencija::query()
+            ->obicna()
             ->when($this->filterFirma !== '', fn ($q) => $q->where('team_id', (int) $this->filterFirma))
             ->when($this->filterGodina !== '', fn ($q) => $q->where('godina', (int) $this->filterGodina))
             ->when($this->filterMesec !== '', fn ($q) => $q->where('mesec', (int) $this->filterMesec))

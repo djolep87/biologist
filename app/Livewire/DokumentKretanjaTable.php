@@ -24,6 +24,8 @@ class DokumentKretanjaTable extends Component
 
     public bool $showAllTeams = false;
 
+    public string $filterTip = '';
+
     public ?int $pregledDokumentId = null;
 
     public ?int $confirmingDeleteId = null;
@@ -37,6 +39,17 @@ class DokumentKretanjaTable extends Component
 
     public function updatingSearch(): void
     {
+        $this->resetPage();
+    }
+
+    public function updatingFilterTip(): void
+    {
+        $this->resetPage();
+    }
+
+    public function setFilterTip(string $tip): void
+    {
+        $this->filterTip = $tip;
         $this->resetPage();
     }
 
@@ -111,14 +124,18 @@ class DokumentKretanjaTable extends Component
     {
         return $this->dokumentQuery()
             ->when($this->showAllTeams, fn ($q) => $q->with('team'))
+            ->with(['constructionSite'])
             ->withCount('dnevneEvidencije')
+            ->when($this->filterTip === 'obicni', fn ($q) => $q->obicni())
+            ->when($this->filterTip === 'gradjevinski', fn ($q) => $q->gradjevinski())
             ->when($this->search, function ($q) {
                 $q->where(function ($q) {
                     $q->where('broj_dokumenta', 'like', '%'.$this->search.'%')
                         ->orWhere('broj_izvestaja', 'like', '%'.$this->search.'%')
                         ->orWhere('indeksni_broj', 'like', '%'.$this->search.'%')
                         ->orWhere('vrsta_otpada', 'like', '%'.$this->search.'%')
-                        ->orWhere('primalac_naziv', 'like', '%'.$this->search.'%');
+                        ->orWhere('primalac_naziv', 'like', '%'.$this->search.'%')
+                        ->orWhere('broj_gradevinske_dozvole_dko', 'like', '%'.$this->search.'%');
                 });
             })
             ->orderBy($this->sortColumn(), $this->sortDir === 'asc' ? 'asc' : 'desc')

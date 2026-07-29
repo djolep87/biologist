@@ -147,7 +147,7 @@ class DnevnaEvidencijaTable extends Component
     public function openEdit(int $id): void
     {
         if ($this->evidenciarMode) {
-            $evidencija = DnevnaEvidencija::forTeam()->findOrFail($id);
+            $evidencija = DnevnaEvidencija::forTeam()->obicna()->findOrFail($id);
             if ($evidencija->user_id !== auth()->id()) {
                 $this->dispatch('notify', message: 'Možete menjati samo svoje unose.', type: 'error');
 
@@ -176,7 +176,7 @@ class DnevnaEvidencijaTable extends Component
             return;
         }
 
-        $evidencija = DnevnaEvidencija::forTeam()->findOrFail($id);
+        $evidencija = DnevnaEvidencija::forTeam()->obicna()->findOrFail($id);
 
         $user = auth()->user();
         if ($evidencija->user_id !== $user->id && ! $user->ownsTeam($evidencija->team)) {
@@ -194,6 +194,7 @@ class DnevnaEvidencijaTable extends Component
     protected function filteredQuery()
     {
         return DnevnaEvidencija::forTeam()
+            ->obicna()
             ->with(['dokumentKretanja', 'zahtevi'])
             ->when($this->search, function ($q) {
                 $q->where(function ($q) {
@@ -216,6 +217,7 @@ class DnevnaEvidencijaTable extends Component
     protected function periodActivityQuery()
     {
         return DnevnaEvidencija::forTeam()
+            ->obicna()
             ->when($this->filterGodina !== '', fn ($q) => $q->where('godina', (int) $this->filterGodina))
             ->when($this->filterMesec !== '', fn ($q) => $q->where('mesec', (int) $this->filterMesec))
             ->when($this->filterIndeksniBroj !== '', fn ($q) => $q->where('indeksni_broj', $this->filterIndeksniBroj));
@@ -227,6 +229,7 @@ class DnevnaEvidencijaTable extends Component
     protected function periodSkladisteQuery()
     {
         return DnevnaEvidencija::forTeam()
+            ->obicna()
             ->when($this->filterGodina !== '', fn ($q) => $q->where('godina', (int) $this->filterGodina))
             ->when($this->filterMesec !== '', fn ($q) => $q->where('mesec', '<=', (int) $this->filterMesec))
             ->when($this->filterIndeksniBroj !== '', fn ($q) => $q->where('indeksni_broj', $this->filterIndeksniBroj));

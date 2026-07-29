@@ -66,6 +66,25 @@
             <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-white/5 hover:text-white">
                 <span>🚛</span> Kretanje Otpada
             </a>
+
+            <div class="pt-3 mt-2 border-t border-white/10">
+                <p class="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">🏗️ Građevinski otpad</p>
+                <a href="{{ route('gradilista.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ request()->routeIs('gradilista.index') || request()->routeIs('gradilista.show') || request()->routeIs('gradilista.edit') || request()->routeIs('gradilista.deo1.*') ? 'bg-green-500/20 text-green-400' : 'text-gray-300 hover:bg-white/5 hover:text-white' }}">
+                    <span>🏗️</span> Moja gradilišta
+                </a>
+                <a href="{{ route('gradilista.create') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ request()->routeIs('gradilista.create') ? 'bg-green-500/20 text-green-400' : 'text-gray-300 hover:bg-white/5 hover:text-white' }}">
+                    <span>➕</span> Novo gradilište
+                </a>
+                <a href="{{ route('dko-zahtevi.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ request()->routeIs('dko-zahtevi.*') ? 'bg-green-500/20 text-green-400' : 'text-gray-300 hover:bg-white/5 hover:text-white' }}">
+                    <span>📋</span> DKO Zahtevi
+                    @if (($aktivniDkoZahteviCount ?? 0) > 0)
+                        <span class="ml-auto min-w-[1.25rem] h-5 px-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                            {{ $aktivniDkoZahteviCount }}
+                        </span>
+                    @endif
+                </a>
+            </div>
+
             <a href="{{ Auth::user()->currentTeam ? route('teams.show', Auth::user()->currentTeam) : route('teams.create') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ request()->routeIs('teams.*') ? 'bg-green-500/20 text-green-400' : 'text-gray-300 hover:bg-white/5 hover:text-white' }}">
                 <span>🏭</span> Moje Firme
             </a>

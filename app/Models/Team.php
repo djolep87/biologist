@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
@@ -99,6 +100,11 @@ class Team extends JetstreamTeam
             'prefix' => trim((string) ($this->dko_prefix ?? '')),
             'lokacije' => $lokacije,
         ];
+    }
+
+    public function constructionSites(): HasMany
+    {
+        return $this->hasMany(ConstructionSite::class);
     }
 
     /**

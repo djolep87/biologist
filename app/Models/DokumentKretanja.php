@@ -18,6 +18,8 @@ class DokumentKretanja extends Model
     protected $fillable = [
         'team_id',
         'user_id',
+        'construction_site_id',
+        'broj_gradevinske_dozvole_dko',
         'broj_dokumenta',
         'broj_izvestaja',
         'redni_broj',
@@ -138,9 +140,29 @@ class DokumentKretanja extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function constructionSite(): BelongsTo
+    {
+        return $this->belongsTo(ConstructionSite::class, 'construction_site_id');
+    }
+
     public function dnevneEvidencije(): HasMany
     {
         return $this->hasMany(DnevnaEvidencija::class, 'dokument_kretanja_id');
+    }
+
+    public function isGradjevinski(): bool
+    {
+        return ! is_null($this->construction_site_id);
+    }
+
+    public function scopeObicni(Builder $query): Builder
+    {
+        return $query->whereNull('construction_site_id');
+    }
+
+    public function scopeGradjevinski(Builder $query): Builder
+    {
+        return $query->whereNotNull('construction_site_id');
     }
 
     public function scopeForTeam(Builder $query, ?int $teamId = null): Builder
@@ -148,5 +170,17 @@ class DokumentKretanja extends Model
         $teamId ??= Auth::user()?->currentTeam?->id;
 
         return $query->when($teamId, fn (Builder $q) => $q->where('team_id', $teamId));
+    }
+
+    public function getLokacijaNastankaZaExportAttribute(): string
+    {
+        $lokacija = trim((string) ($this->lokacija_utovara ?: $this->proizvodjac_ulica));
+        $dozvola = trim((string) ($this->broj_gradevinske_dozvole_dko ?? ''));
+
+        if (! $this->isGradjevinski() || $dozvola === '') {
+            return $lokacija;
+        }
+
+        return $lokacija."\nBroj građevinske dozvole: ".$dozvola;
     }
 }

@@ -74,6 +74,15 @@
                     </span>
                 @endif
             </a>
+            <a href="{{ route('admin.dko-zahtevi.index') }}"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ request()->routeIs('admin.dko-zahtevi.*') ? 'bg-indigo-500/20 text-indigo-300' : 'text-gray-300 hover:bg-white/5 hover:text-white' }}">
+                <span>📋</span> DKO Zahtevi (građ.)
+                @if (($gradjevinskiDkoNaCekanjuCount ?? 0) > 0)
+                    <span class="ml-auto min-w-[1.25rem] h-5 px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {{ $gradjevinskiDkoNaCekanjuCount }}
+                    </span>
+                @endif
+            </a>
             <a href="{{ route('admin.dokumenti.index') }}"
                 class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ request()->routeIs('admin.dokumenti.*') ? 'bg-indigo-500/20 text-indigo-300' : 'text-gray-300 hover:bg-white/5 hover:text-white' }}">
                 <span>🚛</span> Svi DOKO dokumenti

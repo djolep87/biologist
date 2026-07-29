@@ -39,6 +39,9 @@ class NotificationBell extends Component
             'novi_zahtev' => '📨 Novi zahtev — ' . ($data['firma'] ?? ''),
             'zahtev_obradjen' => '✅ Zahtev obrađen — ' . ($data['broj_dokumenta'] ?? ''),
             'zahtev_odbijen' => '❌ Zahtev odbijen',
+            'novi_gradjevinski_dko_zahtev' => '📋 Novi DKO zahtev — ' . ($data['firma'] ?? ''),
+            'gradjevinski_dko_zahtev_obradjen' => '✅ DKO spreman — ' . ($data['broj_zahteva'] ?? ''),
+            'gradjevinski_dko_zahtev_odbijen' => '❌ DKO zahtev odbijen — ' . ($data['broj_zahteva'] ?? ''),
             default => $data['poruka'] ?? 'Obaveštenje',
         };
     }
@@ -49,6 +52,9 @@ class NotificationBell extends Component
             'novi_zahtev' => ($data['naziv_otpada'] ?? '') . ' | ' . ($data['masa_ukupno'] ?? '') . ' t',
             'zahtev_obradjen' => $data['poruka'] ?? '',
             'zahtev_odbijen' => $data['poruka'] ?? '',
+            'novi_gradjevinski_dko_zahtev' => ($data['gradiliste'] ?? '') . ' | ' . ($data['masa_ukupno'] ?? '') . ' t',
+            'gradjevinski_dko_zahtev_obradjen' => $data['poruka'] ?? '',
+            'gradjevinski_dko_zahtev_odbijen' => $data['poruka'] ?? '',
             default => '',
         };
     }

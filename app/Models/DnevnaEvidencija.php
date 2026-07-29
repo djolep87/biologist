@@ -19,11 +19,14 @@ class DnevnaEvidencija extends Model
     protected $fillable = [
         'team_id',
         'user_id',
+        'construction_site_id',
         'godina',
         'mesec',
         'indeksni_broj',
         'naziv_otpada',
         'opis_otpada',
+        'nacin_nastanka',
+        'napomena',
         'karakter_otpada',
         'fizicko_stanje',
         'lice_koje_vodi',
@@ -45,6 +48,8 @@ class DnevnaEvidencija extends Model
         'naziv_primaoca',
         'broj_dozvole_primaoca',
         'nacin_odredjivanja',
+        'dko_status',
+        'gradjevinski_dko_zahtev_id',
     ];
 
     protected function casts(): array
@@ -87,6 +92,46 @@ class DnevnaEvidencija extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function constructionSite(): BelongsTo
+    {
+        return $this->belongsTo(ConstructionSite::class, 'construction_site_id');
+    }
+
+    public function gradjevinskiDkoZahtev(): BelongsTo
+    {
+        return $this->belongsTo(GradjevinskiDkoZahtev::class, 'gradjevinski_dko_zahtev_id');
+    }
+
+    public function isGradjevinski(): bool
+    {
+        return ! is_null($this->construction_site_id);
+    }
+
+    public function scopeObicna(Builder $query): Builder
+    {
+        return $query->whereNull('construction_site_id');
+    }
+
+    public function scopeGradjevinska(Builder $query): Builder
+    {
+        return $query->whereNotNull('construction_site_id');
+    }
+
+    public function scopeForConstructionSite(Builder $query, int $siteId): Builder
+    {
+        return $query->where('construction_site_id', $siteId);
+    }
+
+    public function scopeSlobodan(Builder $query): Builder
+    {
+        return $query->where('dko_status', 'slobodan');
+    }
+
+    public function scopeUZahtevu(Builder $query): Builder
+    {
+        return $query->where('dko_status', 'u_zahtevu');
+    }
+
     public function zahtevi(): BelongsToMany
     {
         return $this->belongsToMany(
@@ -115,10 +160,15 @@ class DnevnaEvidencija extends Model
     /**
      * Preračunava kumulativno stanje_na_skladistu za sve zapise jednog indeksa (hronološki).
      */
-    public static function recalculateStanjeZaIndeks(?int $teamId, string $indeksniBroj): void
+    public static function recalculateStanjeZaIndeks(?int $teamId, string $indeksniBroj, ?int $constructionSiteId = null): void
     {
         $records = static::forTeam($teamId)
             ->where('indeksni_broj', $indeksniBroj)
+            ->when(
+                $constructionSiteId !== null,
+                fn (Builder $q) => $q->where('construction_site_id', $constructionSiteId),
+                fn (Builder $q) => $q->whereNull('construction_site_id')
+            )
             ->orderBy('datum')
             ->orderBy('id')
             ->get();
@@ -138,7 +188,7 @@ class DnevnaEvidencija extends Model
 
             $stanje = round(
                 $stanje + (float) $record->proizvedena_kolicina - (float) $record->predata_kolicina,
-                2
+                3
             );
 
             if ((float) $record->stanje_na_skladistu !== $stanje) {
@@ -250,7 +300,7 @@ class DnevnaEvidencija extends Model
      */
     public static function summariesByIndeks(?int $teamId = null, ?int $godina = null, ?int $mesec = null): Collection
     {
-        $activityQuery = static::forTeam($teamId);
+        $activityQuery = static::forTeam($teamId)->obicna();
 
         if ($godina !== null) {
             $activityQuery->where('godina', $godina);
@@ -267,7 +317,7 @@ class DnevnaEvidencija extends Model
             ->get();
 
         // Snapshot skladišta na kraj perioda (YTD ako je izabran mesec)
-        $skladisteQuery = static::forTeam($teamId);
+        $skladisteQuery = static::forTeam($teamId)->obicna();
 
         if ($godina !== null) {
             $skladisteQuery->where('godina', $godina);
