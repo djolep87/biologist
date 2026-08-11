@@ -11,10 +11,18 @@ class TeamAccess
 
     public const ROLE_EVIDENCIAR = 'evidenciar';
 
-    public static function canAccessTeam(User $user, Team|int $team): bool
+    public static function canAccessTeam(User $user, Team|int|null $team): bool
     {
         if ($user->is_super_admin) {
             return true;
+        }
+
+        if (is_int($team)) {
+            $team = Team::find($team);
+        }
+
+        if (! $team) {
+            return false;
         }
 
         return $user->belongsToTeam($team);

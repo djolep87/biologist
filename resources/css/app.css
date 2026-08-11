@@ -265,6 +265,35 @@
         border-color: rgba(255, 255, 255, 0.18);
     }
 
+    .landing-card {
+        @apply rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-200;
+    }
+
+    .landing-card:hover {
+        @apply shadow-md border-green-100;
+        transform: translateY(-2px);
+    }
+
+    .landing-icon-tile {
+        @apply inline-flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-600;
+    }
+
+    .landing-chip {
+        @apply inline-flex items-center gap-1.5 rounded-full border border-green-100 bg-green-50 px-3 py-1 text-xs font-semibold;
+        color: #15803d;
+    }
+
+    .landing-pill {
+        @apply inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium;
+        background-color: var(--bio-bg-dark-elevated);
+        border-color: rgba(255, 255, 255, 0.22);
+        color: var(--bio-text-on-dark-muted);
+    }
+
+    .landing-problem-card {
+        @apply rounded-2xl border border-red-100 bg-white p-6 shadow-sm;
+    }
+
     .landing-footer {
         background-color: var(--bio-bg-dark);
         color: var(--bio-text-on-dark);

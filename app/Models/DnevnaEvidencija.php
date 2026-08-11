@@ -219,25 +219,103 @@ class DnevnaEvidencija extends Model
         };
     }
 
-    public static function katalogOtpada(): array
+    /**
+     * Katalog otpada za brzi izbor u obrascu, grupisan po vrsti otpada.
+     *
+     * Nazivi su preuzeti iz Kataloga otpada (Pravilnik o kategorijama, ispitivanju
+     * i klasifikaciji otpada) i upisuju se u obrazac takvi kakvi jesu. „Napomena" je
+     * samo pomoć pri izboru — prikazuje se u listi, ali se ne upisuje u evidenciju.
+     * Više šifara deli isti zvanični naziv (npr. „materijali nepodobni za potrošnju
+     * ili obradu"), pa napomena govori na koju delatnost se šifra odnosi.
+     *
+     * Polje i dalje prima i šifre kojih nema u listi — katalog je pomoć, ne ograničenje.
+     *
+     * @return array<string, array<string, array{naziv: string, napomena?: string, opasan?: bool}>>
+     */
+    public static function katalogOtpadaGrupisano(): array
     {
         return [
-            '15 01 01' => 'Papirna i kartonska ambalaža',
-            '15 01 02' => 'Plastična ambalaža',
-            '15 01 04' => 'Metalna ambalaža',
-            '15 01 07' => 'Staklena ambalaža',
-            '20 01 01' => 'Papir i karton',
-            '20 01 02' => 'Staklo',
-            '20 01 08' => 'Biorazgradivi otpad iz kuhinja',
-            '20 01 21' => 'Fluorescentne cevi (sadrže živu)',
-            '20 01 33' => 'Baterije i akumulatori',
-            '13 02 05' => 'Mineralna neklorisana motorna ulja',
-            '13 02 06' => 'Sintetička motorna ulja',
-            '16 01 03' => 'Istrošene gume',
-            '17 04 05' => 'Gvožđe i čelik',
-            '20 03 01' => 'Mešani komunalni otpad',
-            '08 01 11' => 'Otpadne boje i lakovi',
+            'Ambalažni otpad' => [
+                '15 01 01' => ['naziv' => 'Papirna i kartonska ambalaža'],
+                '15 01 02' => ['naziv' => 'Plastična ambalaža'],
+                '15 01 04' => ['naziv' => 'Metalna ambalaža'],
+                '15 01 07' => ['naziv' => 'Staklena ambalaža'],
+            ],
+            'Otpad od hrane i pića' => [
+                '02 01 02' => ['naziv' => 'Otpad od životinjskog tkiva', 'napomena' => 'poljoprivreda, stočarstvo, ribolov'],
+                '02 01 03' => ['naziv' => 'Otpad od biljnog tkiva', 'napomena' => 'poljoprivreda, hortikultura'],
+                '02 02 02' => ['naziv' => 'Otpad od životinjskog tkiva', 'napomena' => 'priprema i obrada mesa i ribe'],
+                '02 02 03' => ['naziv' => 'Materijali nepodobni za potrošnju ili obradu', 'napomena' => 'meso, riba, hrana životinjskog porekla'],
+                '02 03 01' => ['naziv' => 'Muljevi od pranja, čišćenja, ljuštenja, centrifugiranja i separacije', 'napomena' => 'voće, povrće, žitarice'],
+                '02 03 04' => ['naziv' => 'Materijali nepodobni za potrošnju ili obradu', 'napomena' => 'voće, povrće, žitarice, jestiva ulja, kafa, čaj'],
+                '02 04 01' => ['naziv' => 'Zemlja od čišćenja i pranja šećerne repe', 'napomena' => 'prerada šećera'],
+                '02 05 01' => ['naziv' => 'Materijali nepodobni za potrošnju ili obradu', 'napomena' => 'mlekare i mlečni proizvodi'],
+                '02 06 01' => ['naziv' => 'Materijali nepodobni za potrošnju ili obradu', 'napomena' => 'pekare i konditorska industrija'],
+                '02 07 01' => ['naziv' => 'Otpadi od pranja, čišćenja i mehaničkog tretmana sirovog materijala', 'napomena' => 'proizvodnja pića'],
+                '02 07 02' => ['naziv' => 'Otpadi od destilacije alkohola'],
+                '02 07 04' => ['naziv' => 'Materijali nepodobni za potrošnju ili obradu', 'napomena' => 'alkoholna i bezalkoholna pića'],
+                '20 01 08' => ['naziv' => 'Biorazgradivi kuhinjski i otpad iz restorana', 'napomena' => 'kuhinje, kantine, ugostiteljstvo'],
+                '20 01 25' => ['naziv' => 'Jestiva ulja i masti', 'napomena' => 'korišćeno ulje iz kuhinje'],
+                '20 03 02' => ['naziv' => 'Otpad sa pijaca'],
+            ],
+            'Roba van specifikacije i sa isteklim rokom' => [
+                '16 03 06' => ['naziv' => 'Organski otpadi drugačiji od onih navedenih u 16 03 05', 'napomena' => 'hrana i piće sa isteklim rokom, bez opasnih supstanci'],
+                '16 03 04' => ['naziv' => 'Neorganski otpadi drugačiji od onih navedenih u 16 03 03', 'napomena' => 'neorganska roba van roka, bez opasnih supstanci'],
+                '16 03 05' => ['naziv' => 'Organski otpadi koji sadrže opasne supstance', 'napomena' => 'organska roba van roka, sa opasnim supstancama', 'opasan' => true],
+                '16 03 03' => ['naziv' => 'Neorganski otpadi koji sadrže opasne supstance', 'napomena' => 'neorganska roba van roka, sa opasnim supstancama', 'opasan' => true],
+            ],
+            'Komunalni otpad' => [
+                '20 01 01' => ['naziv' => 'Papir i karton'],
+                '20 01 02' => ['naziv' => 'Staklo'],
+                '20 01 21' => ['naziv' => 'Fluorescentne cevi i drugi otpad koji sadrži živu', 'opasan' => true],
+                '20 01 33' => ['naziv' => 'Baterije i akumulatori', 'opasan' => true],
+                '20 02 01' => ['naziv' => 'Biodegradabilni otpad', 'napomena' => 'bašte i parkovi'],
+                '20 03 01' => ['naziv' => 'Mešani komunalni otpad'],
+            ],
+            'Ulja, gume i ostalo' => [
+                '08 01 11' => ['naziv' => 'Otpadna boja i lak koji sadrže organske rastvarače ili druge opasne supstance', 'opasan' => true],
+                '13 02 05' => ['naziv' => 'Mineralna nehlorovana motorna ulja, ulja za menjače i podmazivanje', 'opasan' => true],
+                '13 02 06' => ['naziv' => 'Sintetička motorna ulja, ulja za menjače i podmazivanje', 'opasan' => true],
+                '16 01 03' => ['naziv' => 'Otpadne gume'],
+                '17 04 05' => ['naziv' => 'Gvožđe i čelik'],
+            ],
         ];
+    }
+
+    /**
+     * Ravna mapa šifra => naziv (koristi se za automatsko popunjavanje naziva otpada).
+     *
+     * @return array<string, string>
+     */
+    public static function katalogOtpada(): array
+    {
+        $katalog = [];
+
+        foreach (static::katalogOtpadaGrupisano() as $stavke) {
+            foreach ($stavke as $sifra => $stavka) {
+                $katalog[$sifra] = $stavka['naziv'];
+            }
+        }
+
+        ksort($katalog);
+
+        return $katalog;
+    }
+
+    /**
+     * Jedna stavka kataloga po indeksnom broju — null ako šifre nema u listi.
+     *
+     * @return array{naziv: string, napomena?: string, opasan?: bool}|null
+     */
+    public static function katalogStavka(string $sifra): ?array
+    {
+        foreach (static::katalogOtpadaGrupisano() as $stavke) {
+            if (isset($stavke[$sifra])) {
+                return $stavke[$sifra];
+            }
+        }
+
+        return null;
     }
 
     public static function ukupnoNaSkladistu(?int $teamId = null, ?int $godina = null, ?int $mesec = null): float

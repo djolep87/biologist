@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\DnevnaEvidencija;
 use App\Support\TeamAccess;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -120,10 +121,18 @@ class DnevnaEvidencijaForm extends Component
 
     public function updatedIndeksniBroj($value): void
     {
-        $katalog = DnevnaEvidencija::katalogOtpada();
-        if (isset($katalog[$value])) {
-            $this->naziv_otpada = $katalog[$value];
+        $stavka = DnevnaEvidencija::katalogStavka((string) $value);
+
+        if ($stavka) {
+            $this->naziv_otpada = $stavka['naziv'];
+
+            // Opasne šifre iz kataloga (npr. 16 03 05) same postavljaju karakter otpada.
+            // Obrnuto ne važi — ručno izabran karakter se ne poništava.
+            if ($stavka['opasan'] ?? false) {
+                $this->karakter_otpada = 'opasan';
+            }
         }
+
         $this->calculateStanje();
     }
 
@@ -342,7 +351,7 @@ class DnevnaEvidencijaForm extends Component
             return;
         }
 
-        $date = \Illuminate\Support\Carbon::parse($this->datum);
+        $date = Carbon::parse($this->datum);
         $this->godina = $date->year;
         $this->mesec = $date->month;
     }
@@ -417,7 +426,7 @@ class DnevnaEvidencijaForm extends Component
     public function render()
     {
         return view('livewire.dnevna-evidencija-form', [
-            'katalog' => DnevnaEvidencija::katalogOtpada(),
+            'katalog' => DnevnaEvidencija::katalogOtpadaGrupisano(),
         ]);
     }
 }

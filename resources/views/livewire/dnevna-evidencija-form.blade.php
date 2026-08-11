@@ -72,10 +72,15 @@
                                 <label class="bio-label">Indeksni broj</label>
                                 <input type="text" wire:model.live="indeksni_broj" list="katalog-otpada" maxlength="20" placeholder="npr. 15 01 02" class="bio-input font-mono" />
                                 <datalist id="katalog-otpada">
-                                    @foreach ($katalog as $kod => $naziv)
-                                        <option value="{{ $kod }}">{{ $naziv }}</option>
+                                    @foreach ($katalog as $grupa => $stavke)
+                                        @foreach ($stavke as $kod => $stavka)
+                                            <option value="{{ $kod }}">{{ $stavka['naziv'] }}@isset($stavka['napomena']) — {{ $stavka['napomena'] }}@endisset · {{ $grupa }}</option>
+                                        @endforeach
                                     @endforeach
                                 </datalist>
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Kucajte šifru ili naziv — npr. „hrana", „istekl", „ambalaža". Možete uneti i šifru koje nema u listi.
+                                </p>
                                 @error('indeksni_broj') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                             </div>
 

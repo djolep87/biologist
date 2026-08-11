@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan tinker '--execute= *)",
+      "Bash(php artisan *)",
+      "Bash(git stash *)",
+      "Bash(./vendor/bin/pint app/Models/DnevnaEvidencija.php app/Livewire/DnevnaEvidencijaForm.php)",
+      "Bash(php -l app/Livewire/DnevnaEvidencijaForm.php)",
+      "Bash(php -l app/Models/DnevnaEvidencija.php)",
+      "WebSearch",
+      "WebFetch(domain:circulareconomy-serbia.com)",
+      "Bash(python3 -c ' *)",
+      "WebFetch(domain:www.ekostarpak.rs)",
+      "Bash(npm run *)"
+    ]
+  }
+}
