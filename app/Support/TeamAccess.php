@@ -133,6 +133,6 @@ class TeamAccess
             return true;
         }
 
-        return self::canManageEvidencija($user, $user->teams()->find($teamId));
+        return self::canManageEvidencija($user, Team::find($teamId));
     }
 }

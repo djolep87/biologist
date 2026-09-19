@@ -4,6 +4,7 @@ namespace App\Actions\Admin;
 
 use App\Models\DnevnaEvidencija;
 use App\Models\DokumentKretanja;
+use App\Models\GradjevinskiDkoZahtev;
 use App\Models\ZahtevPredaje;
 use Illuminate\Support\Facades\DB;
 
@@ -13,10 +14,14 @@ class DeleteDokumentKretanja
     {
         DB::transaction(function () use ($dokument) {
             $teamId = $dokument->team_id;
-            $indeksi = [];
+            $grupe = [];
 
             foreach ($dokument->dnevneEvidencije as $evidencija) {
-                $indeksi[$evidencija->indeksni_broj] = true;
+                $kljuc = ($evidencija->construction_site_id ?? 'null').'|'.$evidencija->indeksni_broj;
+                $grupe[$kljuc] = [
+                    'construction_site_id' => $evidencija->construction_site_id,
+                    'indeksni_broj' => $evidencija->indeksni_broj,
+                ];
 
                 $evidencija->update([
                     'predat_operateru' => false,
@@ -41,10 +46,24 @@ class DeleteDokumentKretanja
                 'status' => 'u_obradi',
             ]);
 
+            $gradjevinskiZahtev = GradjevinskiDkoZahtev::where('dokument_kretanja_id', $dokument->id)->first();
+
+            if ($gradjevinskiZahtev) {
+                $gradjevinskiZahtev->update([
+                    'dokument_kretanja_id' => null,
+                    'status' => GradjevinskiDkoZahtev::STATUS_U_OBRADI,
+                    'zavrseno_at' => null,
+                ]);
+
+                $gradjevinskiZahtev->evidencije()->update([
+                    'dko_status' => 'u_zahtevu',
+                ]);
+            }
+
             $dokument->delete();
 
-            foreach (array_keys($indeksi) as $indeksniBroj) {
-                DnevnaEvidencija::recalculateStanjeZaIndeks($teamId, $indeksniBroj);
+            foreach ($grupe as $grupa) {
+                DnevnaEvidencija::recalculateStanjeZaIndeks($teamId, $grupa['indeksni_broj'], $grupa['construction_site_id']);
             }
         });
     }

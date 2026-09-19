@@ -185,7 +185,13 @@ class DnevnaEvidencijaTable extends Component
             return;
         }
 
+        $teamId = $evidencija->team_id;
+        $indeksniBroj = $evidencija->indeksni_broj;
+
         $evidencija->delete();
+
+        DnevnaEvidencija::recalculateStanjeZaIndeks($teamId, $indeksniBroj);
+
         $this->confirmingDeleteId = null;
         $this->dispatch('evidencijaUpdated');
         $this->dispatch('notify', message: 'Evidencija je obrisana.', type: 'success');

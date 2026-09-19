@@ -85,7 +85,7 @@
 
                         <div class="bg-[#f8f9f4] border border-gray-200 rounded-xl p-4 mb-5">
                             <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Pregled zahteva</p>
-                            @php $prva = \App\Models\DnevnaEvidencija::find($izabraniIds[0] ?? null); @endphp
+                            @php $prva = \App\Models\DnevnaEvidencija::forTeam()->obicna()->find($izabraniIds[0] ?? null); @endphp
                             <dl class="space-y-2 text-sm">
                                 <div class="flex justify-between gap-4">
                                     <dt class="text-gray-500">Vrsta otpada:</dt>

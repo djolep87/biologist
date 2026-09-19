@@ -169,6 +169,7 @@ class DnevnaEvidencijaForm extends Component
         }
 
         $query = DnevnaEvidencija::forTeam()
+            ->obicna()
             ->where('indeksni_broj', $this->indeksni_broj)
             ->where('datum', '<', $this->datum);
 
@@ -232,7 +233,7 @@ class DnevnaEvidencijaForm extends Component
     #[On('openEditForm')]
     public function openEdit(int $evidencijaId): void
     {
-        $evidencija = DnevnaEvidencija::forTeam()->findOrFail($evidencijaId);
+        $evidencija = DnevnaEvidencija::forTeam()->obicna()->findOrFail($evidencijaId);
 
         if ($evidencija->dokument_kretanja_id) {
             $this->dispatch('notify', message: 'Predati izveštaji povezani sa DOKO dokumentom ne mogu se menjati.', type: 'error');
@@ -278,6 +279,8 @@ class DnevnaEvidencijaForm extends Component
             return;
         }
 
+        $originalIndeksniBroj = ($this->isEdit && $this->evidencija) ? $this->evidencija->indeksni_broj : null;
+
         $data = [
             'team_id' => $teamId,
             'user_id' => auth()->id(),
@@ -322,6 +325,12 @@ class DnevnaEvidencijaForm extends Component
             $this->dispatch('notify', message: 'Greška pri čuvanju evidencije. Pokušajte ponovo.', type: 'error');
 
             return;
+        }
+
+        DnevnaEvidencija::recalculateStanjeZaIndeks($teamId, $this->indeksni_broj);
+
+        if ($originalIndeksniBroj && $originalIndeksniBroj !== $this->indeksni_broj) {
+            DnevnaEvidencija::recalculateStanjeZaIndeks($teamId, $originalIndeksniBroj);
         }
 
         $this->showModal = false;

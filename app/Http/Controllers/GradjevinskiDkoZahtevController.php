@@ -8,6 +8,7 @@ use App\Models\DnevnaEvidencija;
 use App\Models\GradjevinskiDkoZahtev;
 use App\Models\User;
 use App\Notifications\NoviGradjevinskiDkoZahtev;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -74,37 +75,58 @@ class GradjevinskiDkoZahtevController extends Controller
         $data = $request->validated();
         $ids = array_map('intval', $data['deo1_zapisi']);
 
-        $zahtev = DB::transaction(function () use ($request, $teamId, $data, $ids) {
-            $broj = GradjevinskiDkoZahtev::generateBrojZahteva($teamId);
+        $zahtev = null;
+        $pokusaj = 0;
 
-            $zapisi = DnevnaEvidencija::query()
-                ->whereIn('id', $ids)
-                ->lockForUpdate()
-                ->get();
+        // Retry na duplicate key — lockForUpdate() nema šta da zaključa kad je ovo
+        // prvi zahtev firme u godini, pa se konkurentan upis broja rešava ovde.
+        do {
+            $pokusaj++;
 
-            $masa = round((float) $zapisi->sum(fn ($z) => (float) $z->stanje_na_skladistu ?: (float) $z->proizvedena_kolicina), 3);
+            try {
+                $zahtev = DB::transaction(function () use ($request, $teamId, $data, $ids) {
+                    $broj = GradjevinskiDkoZahtev::generateBrojZahteva($teamId);
 
-            $zahtev = GradjevinskiDkoZahtev::create([
-                'team_id' => $teamId,
-                'construction_site_id' => $data['construction_site_id'],
-                'kreirao_korisnik_id' => $request->user()->id,
-                'broj_zahteva' => $broj['broj_zahteva'],
-                'redni_broj' => $broj['redni_broj'],
-                'status' => GradjevinskiDkoZahtev::STATUS_NA_CEKANJU,
-                'masa_ukupno' => $masa,
-                'napomena_klijenta' => $data['napomena_klijenta'] ?? null,
-                'poslato_at' => now(),
-            ]);
+                    $zapisi = DnevnaEvidencija::query()
+                        ->whereIn('id', $ids)
+                        ->lockForUpdate()
+                        ->get();
 
-            $zahtev->evidencije()->attach($ids);
+                    $masa = round((float) $zapisi->sum(fn ($z) => (float) $z->stanje_na_skladistu ?: (float) $z->proizvedena_kolicina), 3);
 
-            DnevnaEvidencija::whereIn('id', $ids)->update([
-                'dko_status' => 'u_zahtevu',
-                'gradjevinski_dko_zahtev_id' => $zahtev->id,
-            ]);
+                    $zahtev = GradjevinskiDkoZahtev::create([
+                        'team_id' => $teamId,
+                        'construction_site_id' => $data['construction_site_id'],
+                        'kreirao_korisnik_id' => $request->user()->id,
+                        'broj_zahteva' => $broj['broj_zahteva'],
+                        'redni_broj' => $broj['redni_broj'],
+                        'status' => GradjevinskiDkoZahtev::STATUS_NA_CEKANJU,
+                        'masa_ukupno' => $masa,
+                        'napomena_klijenta' => $data['napomena_klijenta'] ?? null,
+                        'poslato_at' => now(),
+                    ]);
 
-            return $zahtev;
-        });
+                    $zahtev->evidencije()->attach($ids);
+
+                    DnevnaEvidencija::whereIn('id', $ids)->update([
+                        'dko_status' => 'u_zahtevu',
+                        'gradjevinski_dko_zahtev_id' => $zahtev->id,
+                    ]);
+
+                    return $zahtev;
+                });
+
+                break;
+            } catch (QueryException $e) {
+                if ($pokusaj >= 3 || $e->getCode() !== '23000') {
+                    throw $e;
+                }
+
+                usleep(50_000 * $pokusaj);
+            }
+        } while ($pokusaj < 3);
+
+        abort_unless($zahtev, 500, 'Nije moguće generisati jedinstveni broj zahteva. Pokušajte ponovo.');
 
         User::where('is_super_admin', true)->each(
             fn (User $admin) => $admin->notify(new NoviGradjevinskiDkoZahtev($zahtev))

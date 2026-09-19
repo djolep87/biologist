@@ -8,6 +8,7 @@ use App\Models\ZahtevPredaje;
 use App\Notifications\NoviZahtevPredaje;
 use App\Support\TeamAccess;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -62,6 +63,11 @@ class PosaljiZahtevPredaje extends Component
 
     public function toggleIzbor(int $id, string $indeksni): void
     {
+        if (! in_array($id, $this->izabraniIds, true)
+            && ! DnevnaEvidencija::forTeam()->obicna()->whereKey($id)->exists()) {
+            return;
+        }
+
         if (in_array($id, $this->izabraniIds, true)) {
             $this->izabraniIds = array_values(array_filter(
                 $this->izabraniIds,
@@ -91,12 +97,18 @@ class PosaljiZahtevPredaje extends Component
             return 0;
         }
 
-        return (float) DnevnaEvidencija::whereIn('id', $this->izabraniIds)
+        return (float) DnevnaEvidencija::forTeam()->obicna()->whereIn('id', $this->izabraniIds)
             ->sum('stanje_na_skladistu');
     }
 
     public function posaljiZahtev(): void
     {
+        if (! TeamAccess::hasFullTeamAccess(auth()->user())) {
+            $this->dispatch('notify', message: 'Nemate dozvolu za slanje zahteva.', type: 'error');
+
+            return;
+        }
+
         if (empty($this->izabraniIds)) {
             $this->addError('izbor', 'Izaberite bar jedan izveštaj.');
 
@@ -111,39 +123,50 @@ class PosaljiZahtevPredaje extends Component
             return;
         }
 
-        $evidencije = DnevnaEvidencija::forTeam($teamId)
-            ->obicna()
-            ->whereIn('id', $this->izabraniIds)
-            ->where('predat_operateru', false)
-            ->whereDoesntHave('zahtevi', fn ($q) => $q->whereIn('status', ['na_cekanju', 'u_obradi', 'odbijeno']))
-            ->get();
+        $zahtevId = null;
 
-        if ($evidencije->count() !== count($this->izabraniIds)) {
-            $this->addError('izbor', 'Neki izveštaji više nisu dostupni za predaju.');
+        DB::transaction(function () use ($teamId, &$zahtevId) {
+            $evidencije = DnevnaEvidencija::forTeam($teamId)
+                ->obicna()
+                ->whereIn('id', $this->izabraniIds)
+                ->where('predat_operateru', false)
+                ->whereDoesntHave('zahtevi', fn ($q) => $q->whereIn('status', ['na_cekanju', 'u_obradi', 'odbijeno']))
+                ->lockForUpdate()
+                ->get();
+
+            if ($evidencije->count() !== count($this->izabraniIds)) {
+                return;
+            }
+
+            $indeksi = $evidencije->pluck('indeksni_broj')->unique();
+            if ($indeksi->count() !== 1) {
+                return;
+            }
+
+            $evidencija = $evidencije->first();
+
+            $zahtev = ZahtevPredaje::create([
+                'team_id' => $teamId,
+                'user_id' => auth()->id(),
+                'status' => 'na_cekanju',
+                'indeksni_broj' => $evidencija->indeksni_broj,
+                'naziv_otpada' => $evidencija->naziv_otpada,
+                'masa_ukupno' => (float) $evidencije->sum('stanje_na_skladistu'),
+                'napomena_klijenta' => $this->napomenaKlijenta ?: null,
+            ]);
+
+            $zahtev->evidencije()->attach($this->izabraniIds);
+
+            $zahtevId = $zahtev->id;
+        });
+
+        if (! $zahtevId) {
+            $this->addError('izbor', 'Neki izveštaji više nisu dostupni za predaju ili nisu istog indeksnog broja.');
 
             return;
         }
 
-        $indeksi = $evidencije->pluck('indeksni_broj')->unique();
-        if ($indeksi->count() !== 1) {
-            $this->addError('izbor', 'Svi izveštaji moraju biti istog indeksnog broja.');
-
-            return;
-        }
-
-        $evidencija = $evidencije->first();
-
-        $zahtev = ZahtevPredaje::create([
-            'team_id' => $teamId,
-            'user_id' => auth()->id(),
-            'status' => 'na_cekanju',
-            'indeksni_broj' => $evidencija->indeksni_broj,
-            'naziv_otpada' => $evidencija->naziv_otpada,
-            'masa_ukupno' => $this->ukupnaMasa(),
-            'napomena_klijenta' => $this->napomenaKlijenta ?: null,
-        ]);
-
-        $zahtev->evidencije()->attach($this->izabraniIds);
+        $zahtev = ZahtevPredaje::find($zahtevId);
 
         User::where('is_super_admin', true)->each(
             fn (User $admin) => $admin->notify(new NoviZahtevPredaje($zahtev))

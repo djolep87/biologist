@@ -42,7 +42,7 @@ class GradjevinskiDkoZahtevPolicy
         }
 
         return (int) $zahtev->kreirao_korisnik_id === (int) $user->id
-            || TeamAccess::canAccessTeam($user, $zahtev->team);
+            || TeamAccess::canCreateEvidencija($user, $zahtev->team);
     }
 
     public function manage(User $user, GradjevinskiDkoZahtev $zahtev): bool
